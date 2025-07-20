@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Next.js Authentication",
-  description: "Example using NextAuth.js",
+  title: "Pawmery - Forever Friends",
+  description: "Continue the beautiful story with your beloved pet. Keep their memory alive and find comfort in your everlasting bond.",
 };
 
 export default function RootLayout({

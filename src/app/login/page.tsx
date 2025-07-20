@@ -15,9 +15,9 @@ export default async function LoginPage() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">🐾 Pawmery</h1>
-          <h2 className="text-2xl font-bold text-gray-900">Sign in to your account</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Begin Your Journey</h2>
           <p className="mt-2 text-gray-600">
-            Access your pet care dashboard and manage your furry friends
+            Continue the story with your beloved pet and keep their spirit alive in your heart
           </p>
         </div>
       </div>
@@ -27,7 +27,7 @@ export default async function LoginPage() {
           <div className="space-y-6">
             <div className="text-center">
               <p className="text-sm text-gray-600 mb-6">
-                Sign in with your GitHub account to get started
+                Sign in with your GitHub account to start honoring your pet's memory
               </p>
               
               <form
@@ -65,7 +65,7 @@ export default async function LoginPage() {
 
               <div className="mt-6 text-center">
                 <p className="text-sm text-gray-600">
-                  By signing in, you agree to our terms of service and privacy policy.
+                  A loving space to honor your pet's memory and keep your beautiful bond alive.
                 </p>
               </div>
             </div>

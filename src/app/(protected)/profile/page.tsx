@@ -83,7 +83,7 @@ export default async function ProfilePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="text-sm font-medium text-gray-900">Email Notifications</h4>
-                  <p className="text-sm text-gray-500">Receive emails about your pets and appointments</p>
+                  <p className="text-sm text-gray-500">Receive emails about your account</p>
                 </div>
                 <button
                   type="button"
@@ -97,8 +97,8 @@ export default async function ProfilePage() {
               
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-900">SMS Reminders</h4>
-                  <p className="text-sm text-gray-500">Get text message reminders for appointments</p>
+                  <h4 className="text-sm font-medium text-gray-900">SMS Notifications</h4>
+                  <p className="text-sm text-gray-500">Get text message notifications</p>
                 </div>
                 <button
                   type="button"

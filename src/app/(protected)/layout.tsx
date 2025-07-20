@@ -21,7 +21,7 @@ export default async function ProtectedLayout({
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <Link href="/dashboard" className="text-xl font-semibold text-gray-900 hover:text-blue-600">
-                Pawmery Pet Dashboard
+                🐾 Pawmery
               </Link>
             </div>
             <nav className="hidden md:flex space-x-8">
