@@ -18,7 +18,7 @@ export default async function DashboardPage() {
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Ways to Connect</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Link
-            href="/pets"
+            href="/pets/create-story"
             className="bg-blue-600 text-white p-4 rounded-lg hover:bg-blue-700 transition-colors text-center"
           >
             <div className="text-2xl mb-2">✨</div>

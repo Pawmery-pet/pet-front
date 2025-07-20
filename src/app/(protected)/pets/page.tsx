@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import Link from "next/link";
 
 export default async function PetsPage() {
   const session = await auth();
@@ -19,9 +20,12 @@ export default async function PetsPage() {
         <div className="px-4 py-5 sm:p-6">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-medium text-gray-900">Your Pet Stories</h3>
-            <button className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700 transition-colors">
+            <Link
+              href="/pets/create-story"
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700 transition-colors"
+            >
               Start a New Story
-            </button>
+            </Link>
           </div>
 
           {pets.length === 0 ? (
@@ -31,9 +35,12 @@ export default async function PetsPage() {
               <p className="text-gray-600 mb-6">
                 Begin your first pet's story to preserve their precious memories and keep your beautiful bond alive forever.
               </p>
-              <button className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors">
+              <Link
+                href="/pets/create-story"
+                className="inline-block bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors"
+              >
                 Start Your First Story
-              </button>
+              </Link>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
