@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import Link from "next/link";
+import PendingPetJobs from './PendingPetJobs';
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -12,6 +13,9 @@ export default async function DashboardPage() {
           Welcome to your Pawmery space. Continue the beautiful stories with your beloved pets and cherish your ongoing bond.
         </p>
       </div>
+
+      {/* Pending Pet Jobs Section */}
+      <PendingPetJobs />
       
       {/* Quick Actions */}
       <div className="mb-8">

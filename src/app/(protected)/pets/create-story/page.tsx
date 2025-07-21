@@ -1,6 +1,6 @@
 "use client";
 
-import type { PersonalityResult, SurveyQuestion, SurveyResponse } from "@/personality";
+import type { PersonalityResult, SurveyQuestion, SurveyResponse, OwnerInfo, JobCreationResponse } from "@/personality";
 import { personalityService } from "@/personality";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -10,6 +10,7 @@ interface FormData {
   type: 'dog' | 'cat' | 'bird' | '';
   breed: string;
   responses: SurveyResponse[];
+  ownerInfo: OwnerInfo;
 }
 
 export default function CreateStoryPage() {
@@ -19,10 +20,16 @@ export default function CreateStoryPage() {
     name: '',
     type: '',
     breed: '',
-    responses: []
+    responses: [],
+    ownerInfo: {
+      ownerId: '',
+      ownerName: '',
+      email: '',
+      phone: ''
+    }
   });
   const [surveyQuestions, setSurveyQuestions] = useState<SurveyQuestion[]>([]);
-  const [personalityResult, setPersonalityResult] = useState<PersonalityResult | null>(null);
+  const [jobCreation, setJobCreation] = useState<JobCreationResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingSurvey, setIsLoadingSurvey] = useState(false);
 
@@ -32,7 +39,7 @@ export default function CreateStoryPage() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setFormData(parsed.formData || formData);
+        setFormData(prev => ({ ...prev, ...parsed.formData }));
         setCurrentStep(parsed.currentStep || 1);
         setSurveyQuestions(parsed.surveyQuestions || []);
       } catch (e) {
@@ -77,7 +84,7 @@ export default function CreateStoryPage() {
   };
 
   const nextStep = () => {
-    if (currentStep < 4) {
+    if (currentStep < 5) { // Changed from 4 to 5 steps
       setCurrentStep(currentStep + 1);
     }
   };
@@ -92,44 +99,69 @@ export default function CreateStoryPage() {
     setFormData(prev => ({ ...prev, ...updates }));
   };
 
-  const submitToServer = async () => {
-    if (!formData.type || !formData.breed) return;
+  const submitJobToServer = async () => {
+    if (!formData.type || !formData.breed || !formData.ownerInfo.ownerName || !formData.ownerInfo.email) return;
     
     setIsSubmitting(true);
     try {
-      const result = await personalityService.analyzePersonality({
+      // Generate unique owner ID if not set
+      const ownerInfo = {
+        ...formData.ownerInfo,
+        ownerId: formData.ownerInfo.ownerId || "owner_" + Date.now()
+      };
+
+      const jobResponse = await personalityService.analyzePersonality({
         petName: formData.name,
         kind: formData.type as 'dog' | 'cat' | 'bird',
         breed: formData.breed,
-        responses: formData.responses
+        responses: formData.responses,
+        ownerInfo,
+        metadata: {
+          age: 0, // Could collect this in future
+          location: "Unknown" // Could collect this in future
+        }
       });
       
-      setPersonalityResult(result);
-      nextStep();
+      // Store job info in localStorage for tracking
+      const pendingPets = JSON.parse(localStorage.getItem('pawmery-pending-pets') || '[]');
+      pendingPets.push({
+        jobId: jobResponse.jobId,
+        petName: formData.name,
+        petType: formData.type,
+        breed: formData.breed,
+        status: jobResponse.status,
+        createdAt: new Date().toISOString(),
+        estimatedWaitTime: jobResponse.estimatedWaitTime
+      });
+      localStorage.setItem('pawmery-pending-pets', JSON.stringify(pendingPets));
+      
+      setJobCreation(jobResponse);
+      nextStep(); // Go to success step
     } catch (error) {
-      console.error('Failed to analyze personality:', error);
+      console.error('Failed to submit pet creation job:', error);
+      alert('Failed to create pet. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const confirmCreation = () => {
-    // Clear localStorage
+  const finishFlow = () => {
+    // Clear creation localStorage but keep pending pets
     localStorage.removeItem('pawmery-create-story');
-    // Redirect to pets page
-    router.push('/pets');
-  };
-
-  const restartSurvey = () => {
-    setCurrentStep(3); // Go back to survey step
-    setPersonalityResult(null);
+    // Redirect to dashboard to see job status
+    router.push('/dashboard');
   };
 
   const canProceed = () => {
     switch (currentStep) {
-      case 1: return formData.name.trim() && formData.type;
+      case 1: 
+        return formData.name.trim() && 
+               formData.type && 
+               formData.ownerInfo.ownerName.trim() && 
+               formData.ownerInfo.email.trim();
       case 2: return formData.breed;
       case 3: return formData.responses.length === surveyQuestions.length;
+      case 4: return true; // Confirmation step, no additional validation needed
       default: return true;
     }
   };
@@ -140,13 +172,17 @@ export default function CreateStoryPage() {
       <div className="bg-white border-b">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-2">
-            <h1 className="text-xl font-semibold text-gray-900">Start Your Pet's Story</h1>
-            <span className="text-sm text-gray-500">Step {currentStep} of 4</span>
+            <h1 className="text-xl font-semibold text-gray-900">
+              {currentStep === 5 ? 'Pet Creation Started!' : 'Start Your Pet\'s Story'}
+            </h1>
+            <span className="text-sm text-gray-500">
+              {currentStep === 5 ? 'Complete' : `Step ${currentStep} of 4`}
+            </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(currentStep / 4) * 100}%` }}
+              style={{ width: `${currentStep === 5 ? 100 : (currentStep / 4) * 100}%` }}
             />
           </div>
         </div>
@@ -176,12 +212,18 @@ export default function CreateStoryPage() {
           />
         )}
         
-        {currentStep === 4 && personalityResult && (
-          <ResultsStep 
-            formData={formData}
-            personalityResult={personalityResult}
-            onConfirm={confirmCreation}
-            onRestart={restartSurvey}
+        {currentStep === 4 && (
+          <ConfirmationStep 
+            formData={formData} 
+            updateFormData={updateFormData}
+            surveyQuestions={surveyQuestions}
+          />
+        )}
+
+        {currentStep === 5 && jobCreation && (
+          <JobCreationSuccessStep 
+            jobCreation={jobCreation}
+            onFinish={finishFlow}
           />
         )}
 
@@ -190,12 +232,12 @@ export default function CreateStoryPage() {
           <button
             onClick={prevStep}
             disabled={currentStep === 1}
-            className="px-6 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Previous
           </button>
           
-          {currentStep < 3 && (
+          {currentStep < 4 && (
             <button
               onClick={nextStep}
               disabled={!canProceed()}
@@ -205,13 +247,22 @@ export default function CreateStoryPage() {
             </button>
           )}
           
-          {currentStep === 3 && (
+          {currentStep === 4 && (
             <button
-              onClick={submitToServer}
+              onClick={submitJobToServer}
               disabled={!canProceed() || isSubmitting}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Analyzing...' : 'Create Story'}
+              {isSubmitting ? 'Creating Pet...' : 'Confirm & Create Pet'}
+            </button>
+          )}
+          
+          {currentStep === 5 && (
+            <button
+              onClick={finishFlow}
+              className="px-6 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+            >
+              Go to Dashboard
             </button>
           )}
         </div>
@@ -272,6 +323,55 @@ function PetInfoStep({ formData, updateFormData }: {
             ))}
           </div>
         </div>
+
+        {/* Owner Info Collection at Step 1 */}
+        {formData.type && (
+          <div className="border-t pt-6 space-y-4">
+            <h3 className="text-lg font-medium text-gray-700">Owner Information</h3>
+            
+            <div>
+              <label htmlFor="ownerName" className="block text-sm font-medium text-gray-700 mb-2">
+                Your name
+              </label>
+              <input
+                type="text"
+                id="ownerName"
+                value={formData.ownerInfo.ownerName}
+                onChange={(e) => updateFormData({ ownerInfo: { ...formData.ownerInfo, ownerName: e.target.value } })}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter your name"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                Your email
+              </label>
+              <input
+                type="email"
+                id="email"
+                value={formData.ownerInfo.email}
+                onChange={(e) => updateFormData({ ownerInfo: { ...formData.ownerInfo, email: e.target.value } })}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter your email"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                Your phone (optional)
+              </label>
+              <input
+                type="tel"
+                id="phone"
+                value={formData.ownerInfo.phone}
+                onChange={(e) => updateFormData({ ownerInfo: { ...formData.ownerInfo, phone: e.target.value } })}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter your phone number"
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -388,63 +488,102 @@ function SurveyStep({
   );
 }
 
-// Step 4: Results
-function ResultsStep({ 
-  formData, 
-  personalityResult, 
-  onConfirm, 
-  onRestart 
-}: { 
+// Step 4: Confirmation
+function ConfirmationStep({ formData, updateFormData, surveyQuestions }: { 
   formData: FormData; 
-  personalityResult: PersonalityResult;
-  onConfirm: () => void;
-  onRestart: () => void;
+  updateFormData: (updates: Partial<FormData>) => void;
+  surveyQuestions: SurveyQuestion[];
 }) {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Meet {formData.name}!</h2>
-        <p className="text-gray-600">Here's what we learned about their personality</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Review Your Information</h2>
+        <p className="text-gray-600">Please review the information you've provided for {formData.name}</p>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-6 space-y-6">
+        {/* Pet Info */}
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Pet Details</h3>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <p className="mb-2"><strong>Name:</strong> {formData.name}</p>
+            <p className="mb-2"><strong>Type:</strong> {formData.type}</p>
+            <p><strong>Breed:</strong> {formData.breed}</p>
+          </div>
+        </div>
+
+        {/* Survey Responses */}
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Personality Survey</h3>
+          {formData.responses.length > 0 ? (
+            <div className="bg-gray-50 p-4 rounded-lg">
+              {formData.responses.map((response, index) => {
+                const question = surveyQuestions.find(q => q.questionId === response.questionId);
+                return (
+                  <div key={response.questionId} className="mb-3 last:mb-0">
+                    <p className="text-sm font-medium text-gray-700">{question?.question}</p>
+                    <p className="text-sm text-blue-600">→ {response.answer}</p>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-gray-500">No personality responses provided.</p>
+          )}
+        </div>
+
+        {/* Owner Info */}
+        <div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Owner Information</h3>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <p className="mb-2"><strong>Name:</strong> {formData.ownerInfo.ownerName}</p>
+            <p className="mb-2"><strong>Email:</strong> {formData.ownerInfo.email}</p>
+            {formData.ownerInfo.phone && <p><strong>Phone:</strong> {formData.ownerInfo.phone}</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Step 5: Job Creation Success
+function JobCreationSuccessStep({ 
+  jobCreation, 
+  onFinish 
+}: { 
+  jobCreation: JobCreationResponse;
+  onFinish: () => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Pet's Story is Being Created!</h2>
+        <p className="text-gray-600">We've started generating your pet's unique story.</p>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6 space-y-6">
         <div className="flex items-center space-x-4 p-4 bg-green-50 rounded-lg">
           <div className="text-2xl">✨</div>
           <div>
-            <h3 className="font-semibold text-green-800">Analysis Complete</h3>
-            <p className="text-sm text-green-600">Confidence: {Math.round(personalityResult.confidence * 100)}%</p>
+            <h3 className="font-semibold text-green-800">Job Created</h3>
+            <p className="text-sm text-green-600">Job ID: {jobCreation.jobId}</p>
+            <p className="text-sm text-green-600">Status: {jobCreation.status}</p>
+            <p className="text-sm text-green-600">Estimated Wait Time: {jobCreation.estimatedWaitTime} seconds</p>
           </div>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">Personality Traits</h3>
-          {personalityResult.traits.map((trait) => (
-            <div key={trait.traitId} className="border rounded-lg p-4">
-              <div className="flex justify-between items-start mb-2">
-                <h4 className="font-medium text-gray-900">{trait.name}</h4>
-                <span className="text-sm text-gray-500">{Math.round(trait.value * 100)}%</span>
-              </div>
-              <p className="text-gray-600 text-sm">{trait.description}</p>
-            </div>
-          ))}
         </div>
 
         <div className="border-t pt-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Does this sound like {formData.name}?</h3>
-          <div className="flex space-x-4">
-            <button
-              onClick={onConfirm}
-              className="flex-1 bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700"
-            >
-              Yes, this is perfect! ✨
-            </button>
-            <button
-              onClick={onRestart}
-              className="flex-1 bg-gray-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-gray-700"
-            >
-              Let me adjust the answers
-            </button>
-          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">What's next?</h3>
+          <p className="text-gray-600">
+            Your pet's story is being generated. You can check its status in your dashboard.
+            Once it's ready, you'll receive an email notification.
+          </p>
+          <button
+            onClick={onFinish}
+            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+          >
+            View Dashboard
+          </button>
         </div>
       </div>
     </div>

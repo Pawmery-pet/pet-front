@@ -3,8 +3,18 @@ export { personalityService as default, default as personalityService } from './
 
 // Types
 export type {
-  AnalyzePersonalityParams, FetchSurveyParams, PersonalityResult, PersonalityTrait, SurveyQuestion,
-  SurveyResponse
+  AnalyzePersonalityParams, 
+  FetchSurveyParams, 
+  PersonalityResult, 
+  PersonalityTrait, 
+  SurveyQuestion,
+  SurveyResponse,
+  OwnerInfo,
+  JobCreationResponse,
+  JobStatusResponse,
+  JobStatus,
+  PetMetadata,
+  PersonalityAnalysisRequestBody
 } from './types';
 
 // Data

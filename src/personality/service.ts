@@ -3,8 +3,26 @@ import {
   AnalyzePersonalityParams,
   FetchSurveyParams,
   PersonalityResult,
-  SurveyQuestion
+  SurveyQuestion,
+  PersonalityAnalysisRequestBody,
+  Quiz,
+  QuizAnswer,
+  PetMetadata,
+  JobCreationResponse,
+  JobStatusResponse,
+  JobStatus
 } from './types';
+
+const personalityQuizAPIBaseUrl = "https://t4j3jcpjbg.execute-api.ap-southeast-2.amazonaws.com/prod"
+const personalityAnalysisAPI = `${personalityQuizAPIBaseUrl}/quiz?async=true`
+const personalityAnalysisJobStatusAPI = `${personalityQuizAPIBaseUrl}/quiz/status/{sessionId}`
+
+
+
+// Polling configuration
+const POLLING_INTERVAL = 5 * 1000; // ms
+const MAX_POLLING_TIMEOUT = 5 * 60 * 1000; // 5 minutes in ms
+const MAX_RETRY_ATTEMPTS = 2;
 
 class PersonalityService {
   /**
@@ -12,9 +30,6 @@ class PersonalityService {
    */
   async fetchSurvey(params: FetchSurveyParams): Promise<SurveyQuestion[]> {
     const { kind, breed } = params;
-
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 300));
 
     // For now, return questions based on pet type
     // In the future, this could be enhanced to return different questions based on breed
@@ -29,25 +44,196 @@ class PersonalityService {
   }
 
   /**
-   * Analyze personality based on survey responses
+   * Submit personality analysis job and return jobId for tracking
    */
-  async analyzePersonality(params: AnalyzePersonalityParams): Promise<PersonalityResult> {
-    const { petName, kind, breed, responses } = params;
+  async analyzePersonality(params: AnalyzePersonalityParams): Promise<JobCreationResponse> {
+    const requestBody = this.buildAnalysisRequestBody(params);
 
-    // Simulate API call to personality analysis service
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    console.log('Submitting personality analysis job...');
+    console.log('Request body:', JSON.stringify(requestBody, null, 2));
 
-    // Mock personality analysis - in production this would call a real AI service
-    const mockResult: PersonalityResult = {
-      petId: "pet_" + Date.now(),
-      personalityId: "personality_" + Math.random().toString(36).substr(2, 9),
-      traits: this.generateTraits(petName, kind, responses),
-      confidence: this.calculateConfidence(responses),
-      sessionId: "session_" + Math.random().toString(36).substr(2, 9),
-      message: "Personality analysis completed successfully"
+    try {
+      const response = await fetch(personalityAnalysisAPI, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const jobResponse: JobCreationResponse = await response.json();
+      console.log('Job created:', jobResponse);
+
+      return jobResponse;
+    } catch (error) {
+      console.error('Error submitting personality analysis job:', error);
+      throw new Error(`Failed to submit personality analysis: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Check the status of a specific job
+   */
+  async getJobStatus(jobId: string, retryCount: number = 0): Promise<JobStatusResponse> {
+    const statusUrl = personalityAnalysisJobStatusAPI.replace('{sessionId}', jobId);
+    
+    try {
+      const response = await fetch(statusUrl, {
+        method: 'GET'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Status check failed: ${response.status} ${response.statusText}`);
+      }
+
+      const statusResponse: JobStatusResponse = await response.json();
+      return statusResponse;
+    } catch (error) {
+      // Retry network errors up to MAX_RETRY_ATTEMPTS
+      if (retryCount < MAX_RETRY_ATTEMPTS) {
+        console.warn(`Status check failed, retrying... (attempt ${retryCount + 1}/${MAX_RETRY_ATTEMPTS + 1})`);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
+        return this.getJobStatus(jobId, retryCount + 1);
+      }
+      
+      console.error('Error checking job status:', error);
+      throw new Error(`Failed to check job status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Poll for job completion with status updates
+   */
+  async pollForCompletion(
+    jobId: string, 
+    onStatusUpdate?: (status: JobStatusResponse) => void
+  ): Promise<PersonalityResult> {
+    const startTime = Date.now();
+    
+    console.log(`Starting to poll for job completion: ${jobId}`);
+
+    while (true) {
+      const currentTime = Date.now();
+      
+      // Check timeout
+      if (currentTime - startTime > MAX_POLLING_TIMEOUT) {
+        throw new Error(`Job polling timeout after ${MAX_POLLING_TIMEOUT / 1000} seconds`);
+      }
+
+      try {
+        const statusResponse = await this.getJobStatus(jobId);
+        
+        // Call status update callback if provided
+        if (onStatusUpdate) {
+          onStatusUpdate(statusResponse);
+        }
+
+        console.log(`Job ${jobId} status: ${statusResponse.status}`);
+
+        switch (statusResponse.status) {
+          case 'success':
+            if (statusResponse.result) {
+              // Add job metadata to the result
+              const enrichedResult: PersonalityResult = {
+                ...statusResponse.result,
+                jobId,
+                summary: statusResponse.summary,
+                processingTime: statusResponse.processingTime,
+                completedAt: statusResponse.completedAt
+              };
+              console.log('Job completed successfully:', enrichedResult);
+              return enrichedResult;
+            } else {
+              throw new Error('Job completed but no result data received');
+            }
+
+          case 'failed':
+            throw new Error(`Job failed: ${statusResponse.error || statusResponse.message || 'Unknown error'}`);
+
+          case 'queued':
+          case 'processing':
+            // Continue polling
+            console.log(`Job ${jobId} still ${statusResponse.status}, waiting ${POLLING_INTERVAL / 1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
+            break;
+
+          default:
+            throw new Error(`Unknown job status: ${statusResponse.status}`);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('polling timeout')) {
+          throw error; // Re-throw timeout errors
+        }
+        console.error('Error during polling:', error);
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Build the complete request body structure
+   */
+  buildAnalysisRequestBody(params: AnalyzePersonalityParams): PersonalityAnalysisRequestBody {
+    const { petName, kind, breed, responses, ownerInfo, metadata } = params;
+    
+    // This is a synchronous version that doesn't validate questions exist
+    const petId = "pet_" + Date.now();
+    const timestamp = new Date().toISOString();
+
+    // Get questions from SURVEYS (assumes they exist)
+    const surveyQuestions = SURVEYS[kind];
+    if (!surveyQuestions) {
+      throw new Error(`No survey available for pet type: ${kind}`);
+    }
+
+    // Map responses to quiz answers format
+    const quizAnswers: QuizAnswer[] = responses.map(response => {
+      const question = surveyQuestions.find(q => q.questionId === response.questionId);
+      if (!question) {
+        throw new Error(`Question not found for questionId: ${response.questionId}`);
+      }
+
+      return {
+        questionId: response.questionId,
+        answer: response.answer,
+        weight: question.weights[response.selectedIndex],
+        category: question.category
+      };
+    });
+
+    // Build the quiz object
+    const quiz: Quiz = {
+      quizId: `${kind}_personality_v1`,
+      title: `${kind.charAt(0).toUpperCase() + kind.slice(1)} Personality Assessment`,
+      petType: kind,
+      questions: surveyQuestions,
+      answers: quizAnswers
     };
 
-    return mockResult;
+    // Build complete metadata
+    const completeMetadata: PetMetadata = {
+      breed,
+      source: "web_app",
+      quizVersion: "1.0",
+      timestamp,
+      environment: "home",
+      previousQuizzes: 0,
+      ...metadata
+    };
+
+    return {
+      petId,
+      petName,
+      petType: kind,
+      quiz,
+      answers: quizAnswers,
+      ownerInfo,
+      metadata: completeMetadata
+    };
   }
 
   /**
