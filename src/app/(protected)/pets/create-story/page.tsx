@@ -1,6 +1,6 @@
 "use client";
 
-import type { PersonalityResult, SurveyQuestion, SurveyResponse, OwnerInfo, JobCreationResponse } from "@/personality";
+import type { SurveyQuestion, SurveyResponse, OwnerInfo, JobCreationResponse } from "@/personality";
 import { personalityService } from "@/personality";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
