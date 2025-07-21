@@ -328,53 +328,6 @@ export default function PetDetailPage() {
             )}
           </div>
 
-          {/* Detailed Personality Traits */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center space-x-2 mb-6">
-              <span className="text-xl">⭐</span>
-              <h3 className="text-xl font-semibold text-gray-900">Detailed Personality Traits</h3>
-            </div>
-            
-            {personalityResult.traits && personalityResult.traits.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {personalityResult.traits.map((trait, index) => (
-                  <div key={trait.traitId} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center space-x-2">
-                        <span className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-bold text-blue-600">
-                          {index + 1}
-                        </span>
-                        <h4 className="font-semibold text-gray-900">{trait.name}</h4>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-medium text-gray-600">
-                          {Math.round(trait.value * 100)}%
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          confidence
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-gray-600 text-sm leading-relaxed">{trait.description}</p>
-                    <div className="mt-3">
-                      <div className="bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.round(trait.value * 100)}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="text-4xl mb-4">🔍</div>
-                <p className="text-gray-500">Detailed personality traits are being analyzed...</p>
-              </div>
-            )}
-          </div>
-
           {/* Analysis Metadata */}
           <div className="bg-gray-50 rounded-lg p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Analysis Details</h3>
@@ -440,10 +393,10 @@ export default function PetDetailPage() {
               <div className="text-6xl mb-4">⏳</div>
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">
-              Creating {pendingPet?.petName}'s Story...
+              Creating {pendingPet?.petName}'s Profile...
             </h2>
             <p className="text-gray-600 mb-4">
-              We're analyzing their personality and creating a unique story just for them.
+              We're analyzing their personality and creating a unique profile for {pendingPet?.petName}.
             </p>
             
             {isPolling && (
@@ -451,7 +404,7 @@ export default function PetDetailPage() {
                 <div className="flex items-center justify-center space-x-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                   <span className="text-blue-800 text-sm font-medium">
-                    Checking status every 5 seconds...
+                    Checking status...
                   </span>
                 </div>
               </div>
@@ -462,9 +415,7 @@ export default function PetDetailPage() {
             <h3 className="text-lg font-semibold text-gray-900 mb-3">💡 What we're doing:</h3>
             <ul className="space-y-2 text-sm text-gray-600">
               <li>• Analyzing your pet's personality responses</li>
-              <li>• Creating personalized traits and insights</li>
-              <li>• Generating a unique story summary</li>
-              <li>• Preparing recommendations for bonding</li>
+              <li>• Generating a summary of their personality</li>
             </ul>
           </div>
         </div>
