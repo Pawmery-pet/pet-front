@@ -23,20 +23,6 @@ export interface PersonalityTrait {
   description: string;
 }
 
-export interface PersonalityResult {
-  petId: string;
-  personalityId: string;
-  traits: PersonalityTrait[];
-  confidence: number;
-  sessionId: string;
-  message: string;
-  // New fields for job-based results
-  jobId?: string;
-  summary?: string;
-  processingTime?: number;
-  completedAt?: string;
-}
-
 export interface FetchSurveyParams {
   kind: 'dog' | 'cat' | 'bird';
   breed: string;
@@ -64,8 +50,11 @@ export interface JobStatusResponse {
   updatedAt?: string;
   // Field present only in failed state
   error?: string;
-  // Fields present only in success state
-  result?: PersonalityResult;
+  // Fields present only in success state - the response IS the result
+  personalityId?: string;
+  traits?: PersonalityTrait[];
+  confidence?: number;
+  sessionId?: string;
   summary?: string;
   completedAt?: string;
   processingTime?: number;

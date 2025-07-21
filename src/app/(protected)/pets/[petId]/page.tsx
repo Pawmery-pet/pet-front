@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { personalityService, PersonalityResult, JobStatusResponse, JobStatus } from '@/personality';
+import { personalityService, JobStatusResponse, JobStatus } from '@/personality';
 
 interface PendingPet {
   jobId: string;
@@ -22,47 +22,83 @@ export default function PetDetailPage() {
   
   const [pendingPet, setPendingPet] = useState<PendingPet | null>(null);
   const [jobStatus, setJobStatus] = useState<JobStatusResponse | null>(null);
-  const [personalityResult, setPersonalityResult] = useState<PersonalityResult | null>(null);
+  const [personalityResult, setPersonalityResult] = useState<JobStatusResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
 
   useEffect(() => {
+    console.log({ personalityResult})
+    console.log('🚀 Component mounted, petId:', petId);
+    
     // Check if this is a pending pet
     const stored = localStorage.getItem('pawmery-pending-pets');
+    console.log('💾 Raw localStorage data:', stored);
+    
     if (stored) {
       try {
         const pets: PendingPet[] = JSON.parse(stored);
+        console.log('📋 Parsed pending pets:', pets);
         const pet = pets.find(p => p.jobId === petId);
+        console.log('🎯 Found matching pet:', pet);
+        
         if (pet) {
           setPendingPet(pet);
+          console.log('▶️  Starting polling for pet with status:', pet.status);
           startPollingIfNeeded(pet);
+        } else {
+          console.log('❌ No matching pet found in localStorage');
+          setError('Pet not found in pending jobs');
         }
       } catch (error) {
-        console.error('Error loading pending pet:', error);
+        console.error('Error loading pending pets:', error);
         setError('Error loading pet information');
       }
+    } else {
+      console.log('📭 No pending pets found in localStorage');
+      setError('No pending jobs found');
     }
   }, [petId]);
 
+  // Separate useEffect to track personalityResult changes
+  useEffect(() => {
+    console.log('🎭 PersonalityResult state changed:', personalityResult);
+    if (personalityResult) {
+      console.log('🎉 PersonalityResult is now set!', {
+        summary: personalityResult.summary,
+        traits: personalityResult.traits?.length || 0,
+        jobId: personalityResult.jobId
+      });
+    }
+  }, [personalityResult]);
+
   const startPollingIfNeeded = (pet: PendingPet) => {
+    console.log('🤔 Deciding polling strategy for pet status:', pet.status);
+    
     if (pet.status === 'success' || pet.status === 'failed') {
       // If already completed/failed, just get final status
+      console.log('✅ Pet already completed/failed, checking final status...');
       checkFinalStatus();
     } else {
       // Start real-time polling
+      console.log('🔄 Pet still in progress, starting real-time polling...');
       startPolling();
     }
   };
 
   const checkFinalStatus = async () => {
     try {
+      console.log('🔍 Checking final status for jobId:', petId);
       const status = await personalityService.getJobStatus(petId);
+      console.log('📄 Final status response:', status);
       setJobStatus(status);
       
-      if (status.status === 'success' && status.result) {
-        setPersonalityResult(status.result);
+      if (status.status === 'success') {
+        console.log('✅ Job completed successfully, setting personality result:', status);
+        setPersonalityResult(status);
         // Remove from pending pets since it's completed
         removePendingPet(petId);
+      } else {
+        console.log(`ℹ️  Status is ${status.status}, not success yet`);
       }
     } catch (error) {
       console.error('Error checking final status:', error);
@@ -73,6 +109,7 @@ export default function PetDetailPage() {
   const startPolling = async () => {
     if (isPolling) return; // Prevent multiple polling sessions
     
+    console.log('🔄 Starting polling for jobId:', petId);
     setIsPolling(true);
     setError(null);
     
@@ -80,7 +117,7 @@ export default function PetDetailPage() {
       const result = await personalityService.pollForCompletion(
         petId,
         (statusUpdate: JobStatusResponse) => {
-          console.log('Status update:', statusUpdate);
+          console.log('📡 Polling status update:', statusUpdate);
           setJobStatus(statusUpdate);
           
           // Update pending pet status in localStorage
@@ -88,6 +125,7 @@ export default function PetDetailPage() {
         }
       );
       
+      console.log('🎉 Polling completed with result:', result);
       setPersonalityResult(result);
       setIsPolling(false);
       
@@ -95,7 +133,7 @@ export default function PetDetailPage() {
       removePendingPet(petId);
       
     } catch (error) {
-      console.error('Polling error:', error);
+      console.error('❌ Polling error:', error);
       setError(error instanceof Error ? error.message : 'Error during polling');
       setIsPolling(false);
     }
@@ -260,52 +298,137 @@ export default function PetDetailPage() {
       {/* Results Section */}
       {personalityResult ? (
         <div className="space-y-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">🎉 {pendingPet?.petName}'s Story is Ready!</h2>
+          {/* Main Success Header */}
+          <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <span className="text-2xl">🎉</span>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {pendingPet?.petName}'s Story is Complete!
+                </h2>
+                <p className="text-green-700 font-medium">Analysis completed successfully</p>
+              </div>
+            </div>
             
+            {/* Job Summary - Main Feature */}
             {personalityResult.summary && (
-              <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-                <h3 className="text-lg font-semibold text-blue-800 mb-2">Personality Summary</h3>
-                <p className="text-blue-700">{personalityResult.summary}</p>
+              <div className="bg-white border border-green-200 rounded-lg p-6 shadow-sm">
+                <div className="flex items-center space-x-2 mb-3">
+                  <span className="text-xl">📝</span>
+                  <h3 className="text-xl font-bold text-gray-900">Personality Summary</h3>
+                </div>
+                <div className="prose prose-lg max-w-none">
+                  <p className="text-gray-800 leading-relaxed text-lg">
+                    {personalityResult.summary}
+                  </p>
+                </div>
               </div>
             )}
+          </div>
 
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">Personality Traits</h3>
-              {personalityResult.traits.map((trait) => (
-                <div key={trait.traitId} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium text-gray-900">{trait.name}</h4>
-                    <span className="text-sm text-gray-500">
-                      {Math.round(trait.value * 100)}% confidence
-                    </span>
-                  </div>
-                  <p className="text-gray-600 text-sm">{trait.description}</p>
-                </div>
-              ))}
+          {/* Detailed Personality Traits */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center space-x-2 mb-6">
+              <span className="text-xl">⭐</span>
+              <h3 className="text-xl font-semibold text-gray-900">Detailed Personality Traits</h3>
             </div>
-
-            <div className="mt-6 pt-6 border-t">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-gray-500">
-                    Analysis completed {personalityResult.completedAt && new Date(personalityResult.completedAt).toLocaleString()}
-                  </p>
-                  {personalityResult.processingTime && (
-                    <p className="text-xs text-gray-400">
-                      Processing time: {personalityResult.processingTime} ms
-                    </p>
-                  )}
-                </div>
-                <div className="space-x-4">
-                  <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-                    Add Memory
-                  </button>
-                  <button className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
-                    Share Story
-                  </button>
-                </div>
+            
+            {personalityResult.traits && personalityResult.traits.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {personalityResult.traits.map((trait, index) => (
+                  <div key={trait.traitId} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-bold text-blue-600">
+                          {index + 1}
+                        </span>
+                        <h4 className="font-semibold text-gray-900">{trait.name}</h4>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-gray-600">
+                          {Math.round(trait.value * 100)}%
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          confidence
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-gray-600 text-sm leading-relaxed">{trait.description}</p>
+                    <div className="mt-3">
+                      <div className="bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.round(trait.value * 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-4">🔍</div>
+                <p className="text-gray-500">Detailed personality traits are being analyzed...</p>
+              </div>
+            )}
+          </div>
+
+          {/* Analysis Metadata */}
+          <div className="bg-gray-50 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Analysis Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="font-medium text-gray-600">Completed</p>
+                <p className="text-gray-800">
+                  {personalityResult.completedAt 
+                    ? new Date(personalityResult.completedAt).toLocaleString()
+                    : 'Just now'
+                  }
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-gray-600">Processing Time</p>
+                <p className="text-gray-800">
+                  {personalityResult.processingTime 
+                    ? `${Math.round(personalityResult.processingTime / 1000)}s`
+                    : 'Quick'
+                  }
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-gray-600">Job ID</p>
+                <p className="text-gray-800 font-mono text-xs">{petId}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2">
+                <span>📝</span>
+                <span>Add Memory</span>
+              </button>
+              <button className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center space-x-2">
+                <span>📤</span>
+                <span>Share Story</span>
+              </button>
+              <button className="flex-1 bg-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center justify-center space-x-2">
+                <span>📊</span>
+                <span>View Profile</span>
+              </button>
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <Link
+                href="/pets"
+                className="text-gray-600 hover:text-gray-800 text-sm font-medium flex items-center justify-center space-x-1"
+              >
+                <span>👀</span>
+                <span>View All Pets</span>
+              </Link>
             </div>
           </div>
         </div>

@@ -5,7 +5,6 @@ export { personalityService as default, default as personalityService } from './
 export type {
   AnalyzePersonalityParams, 
   FetchSurveyParams, 
-  PersonalityResult, 
   PersonalityTrait, 
   SurveyQuestion,
   SurveyResponse,
