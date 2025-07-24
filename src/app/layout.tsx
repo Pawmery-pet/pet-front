@@ -12,7 +12,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <footer className="fixed bottom-0 inset-x-0 text-center p-1 bg-white">{`@${new Date().getFullYear()} Pawmery Pet`}</footer>  
+      </body>
     </html>
   );
 }
