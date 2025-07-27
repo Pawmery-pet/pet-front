@@ -1,6 +1,9 @@
 {
+	"schema": "https://json.schemastore.org/devcontainer.json",
 	"name": "Pawmery - Pet Front",
-	"image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+	"dockerComposeFile": "docker-compose.devcontainer.yml",
+	"service": "workspace",
+	"workspaceFolder": "/workspaces/pet-front",
 	"features": {
 		"ghcr.io/devcontainers/features/aws-cli:1": {},
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
